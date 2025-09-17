@@ -142,6 +142,8 @@ app.use((req, res, next) => {
 app.post('/slack/events', async (req, res) => {
   console.log('📨 Received Slack event:');
   
+  console.log(req.body);
+  
   const { type, challenge, event } = req.body;
 
   // Slack URL verification
@@ -170,7 +172,7 @@ app.post('/slack/events', async (req, res) => {
       console.log('📊 Preparing to log to Google Sheets:', {
         timestamp,
         user,
-        message: event.text,
+        // message: event.text,
         channel
       });
 
