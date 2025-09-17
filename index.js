@@ -30,7 +30,7 @@ app.post('/slack/events', async (req, res) => {
 
   // Log oncall messages
   if (event && event.type === 'message' && !event.bot_id) {
-    const message = event.text.toLowerCase();
+    const message = (event.text || '').toLowerCase();
     if (message.includes('oncall') || message.includes('on-call')) {
       const timestamp = new Date().toISOString();
       const user = event.user;
