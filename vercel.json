@@ -1,10 +1,10 @@
 {
     "version": 2,
     "functions": {
-      "api/slack.js": {
-        "runtime": "nodejs18.x"
-      }
-    },
+    "api/slack.js": {
+      "runtime": "vercel-nodejs@18.0.0"
+    }
+  },
     "routes": [
       { "src": "/slack/events", "dest": "/api/slack.js" }
     ]
