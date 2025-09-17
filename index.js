@@ -23,11 +23,13 @@ auth.authorize()
     
     // Test if we can access the sheet
     if (process.env.GOOGLE_SHEET_ID) {
+      console.log('🔍 Attempting to access Google Sheet with ID:', process.env.GOOGLE_SHEET_ID);
       try {
         const response = await sheets.spreadsheets.get({
           spreadsheetId: process.env.GOOGLE_SHEET_ID,
         });
         console.log('✅ Google Sheet access confirmed:', response.data.properties.title);
+        console.log('📊 Sheet URL:', `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}`);
         
         // Check if the onCallLog sheet exists
         const sheetExists = response.data.sheets.some(sheet => 
@@ -41,7 +43,24 @@ auth.authorize()
         }
       } catch (err) {
         console.error('❌ Cannot access Google Sheet:', err.message);
-        console.error('Check your GOOGLE_SHEET_ID and permissions');
+        console.error('📋 Error details:', {
+          code: err.code,
+          status: err.status,
+          details: err.response?.data
+        });
+        
+        if (err.message.includes('permission')) {
+          console.error('🔐 PERMISSION ISSUE:');
+          console.error('1. Make sure your service account email has access to the sheet');
+          console.error('2. Service account email:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+          console.error('3. Share the sheet with this email and give it "Editor" permissions');
+          console.error('4. Sheet URL:', `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}`);
+        } else if (err.message.includes('not found')) {
+          console.error('📄 SHEET NOT FOUND:');
+          console.error('1. Check that your GOOGLE_SHEET_ID is correct');
+          console.error('2. The ID should be the long string in the URL after /d/');
+          console.error('3. Current ID:', process.env.GOOGLE_SHEET_ID);
+        }
       }
     } else {
       console.warn('⚠️ GOOGLE_SHEET_ID not configured');
