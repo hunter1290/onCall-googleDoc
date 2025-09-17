@@ -18,11 +18,38 @@ const sheets = google.sheets({ version: 'v4', auth });
 
 // Test Google Sheets connection on startup
 auth.authorize()
-  .then(() => {
+  .then(async () => {
     console.log('✅ Google Sheets authentication successful');
+    
+    // Test if we can access the sheet
+    if (process.env.GOOGLE_SHEET_ID) {
+      try {
+        const response = await sheets.spreadsheets.get({
+          spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        });
+        console.log('✅ Google Sheet access confirmed:', response.data.properties.title);
+        
+        // Check if the onCallLog sheet exists
+        const sheetExists = response.data.sheets.some(sheet => 
+          sheet.properties.title === 'onCallLog'
+        );
+        
+        if (!sheetExists) {
+          console.warn('⚠️ Warning: onCallLog sheet not found. Please create it or the data will not be logged.');
+        } else {
+          console.log('✅ onCallLog sheet found');
+        }
+      } catch (err) {
+        console.error('❌ Cannot access Google Sheet:', err.message);
+        console.error('Check your GOOGLE_SHEET_ID and permissions');
+      }
+    } else {
+      console.warn('⚠️ GOOGLE_SHEET_ID not configured');
+    }
   })
   .catch((err) => {
     console.error('❌ Google Sheets authentication failed:', err.message);
+    console.error('Check your service account credentials');
   });
 
 // Parse JSON body
@@ -37,6 +64,53 @@ app.get('/health', (req, res) => {
     googleSheetsConfigured: !!process.env.GOOGLE_SHEET_ID,
     serviceAccountConfigured: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
   });
+});
+
+// Test endpoint to manually test Google Sheets functionality
+app.post('/test-sheets', async (req, res) => {
+  console.log('🧪 Testing Google Sheets functionality');
+  
+  try {
+    if (!process.env.GOOGLE_SHEET_ID) {
+      return res.status(400).json({ 
+        error: 'GOOGLE_SHEET_ID not configured' 
+      });
+    }
+
+    const testData = [
+      new Date().toISOString(),
+      'test-user',
+      'Test message for Google Sheets',
+      'test-channel'
+    ];
+
+    const result = await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: 'onCallLog!A:D',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [testData],
+      },
+    });
+
+    console.log('✅ Test data successfully appended to Google Sheets');
+    res.status(200).json({
+      success: true,
+      message: 'Test data appended successfully',
+      result: {
+        updatedRows: result.data.updates?.updatedRows,
+        updatedColumns: result.data.updates?.updatedColumns,
+        updatedCells: result.data.updates?.updatedCells
+      }
+    });
+  } catch (err) {
+    console.error('❌ Test failed:', err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      details: err.response?.data || err.details
+    });
+  }
 });
 
 // Log all incoming requests
@@ -82,7 +156,12 @@ app.post('/slack/events', async (req, res) => {
       });
 
       try {
-        await sheets.spreadsheets.values.append({
+        // Validate required environment variables
+        if (!process.env.GOOGLE_SHEET_ID) {
+          throw new Error('GOOGLE_SHEET_ID environment variable is not set');
+        }
+
+        const result = await sheets.spreadsheets.values.append({
           spreadsheetId: process.env.GOOGLE_SHEET_ID,
           range: 'onCallLog!A:D',
           valueInputOption: 'USER_ENTERED',
@@ -92,12 +171,24 @@ app.post('/slack/events', async (req, res) => {
         });
 
         console.log('✅ On-call message successfully logged to Google Sheets');
+        console.log('📊 Append result:', {
+          updatedRows: result.data.updates?.updatedRows,
+          updatedColumns: result.data.updates?.updatedColumns,
+          updatedCells: result.data.updates?.updatedCells
+        });
       } catch (err) {
         console.error('❌ Google Sheets error:', {
           message: err.message,
           code: err.code,
+          status: err.status,
           details: err.errors || err.details,
-          stack: err.stack
+          response: err.response?.data
+        });
+        
+        // Return error response to Slack
+        return res.status(500).json({ 
+          error: 'Failed to log to Google Sheets',
+          details: err.message 
         });
       }
     } else {
@@ -114,6 +205,8 @@ app.post('/slack/events', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server started successfully on port ${PORT}`);
   console.log(`📡 Slack events endpoint: http://localhost:${PORT}/slack/events`);
+  console.log(`🧪 Test endpoint: http://localhost:${PORT}/test-sheets`);
+  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
   console.log(`📊 Google Sheets integration: ${process.env.GOOGLE_SHEET_ID ? 'Configured' : 'Missing GOOGLE_SHEET_ID'}`);
   console.log(`🔑 Service Account: ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? 'Configured' : 'Missing GOOGLE_SERVICE_ACCOUNT_EMAIL'}`);
 });
