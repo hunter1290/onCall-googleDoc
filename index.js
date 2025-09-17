@@ -142,7 +142,7 @@ app.use((req, res, next) => {
 app.post('/slack/events', async (req, res) => {
   console.log('📨 Received Slack event:');
   
-  console.log(req.body);
+//   console.log(req.body);
   
   const { type, challenge, event } = req.body;
 
@@ -153,7 +153,7 @@ app.post('/slack/events', async (req, res) => {
   }
 
   // Log oncall messages
-  if (event && event.type === 'message' && !event.bot_id || 2===2) { // skingpping if to capture all
+  if ((event && event.type === 'message' && !event.bot_id )|| event.message.text) { // skingpping if to capture all
     console.log('💬 Processing message event:', {
       user: event.user,
       channel: event.channel,
@@ -162,7 +162,7 @@ app.post('/slack/events', async (req, res) => {
     });
     
     const message = (event.text || '').toLowerCase();
-    if (message.includes('oncall') || message.includes('on-call') || 2===2) { //skipping if to capture all
+    if (message.includes('oncall') || message.includes('on-call') || event.message.text) { //skipping if to capture all
       console.log('🚨 On-call keyword detected in message');
       
       const timestamp = new Date().toISOString();
