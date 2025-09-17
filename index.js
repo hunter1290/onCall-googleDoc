@@ -172,7 +172,7 @@ app.post('/slack/events', async (req, res) => {
       console.log('📊 Preparing to log to Google Sheets:', {
         timestamp,
         user,
-        // message: event.text,
+        message: event.message.text,
         channel
       });
 
@@ -187,7 +187,7 @@ app.post('/slack/events', async (req, res) => {
           range: 'onCallLog!A:D',
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[timestamp, user, event.text, channel]],
+            values: [[timestamp, user, event.message.text, channel]],
           },
         });
 
