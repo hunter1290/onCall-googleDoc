@@ -1,19 +1,12 @@
 {
   "name": "oncall-googlesheetupdate",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "type": "module",
+  "main": "api/slack.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vercel dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "body-parser": "^2.2.0",
-    "dotenv": "^17.2.2",
-    "express": "^5.1.0",
     "googleapis": "^160.0.0"
   }
 }
