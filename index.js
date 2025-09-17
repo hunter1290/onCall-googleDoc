@@ -134,13 +134,13 @@ app.post('/test-sheets', async (req, res) => {
 
 // Log all incoming requests
 app.use((req, res, next) => {
-  console.log(`📥 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+//   console.log(`📥 ${req.method} ${req.path} - ${new Date().toISOString()}`);
   next();
 });
 
 // Slack Events Endpoint
 app.post('/slack/events', async (req, res) => {
-  console.log('📨 Received Slack event:', JSON.stringify(req.body, null, 2));
+  console.log('📨 Received Slack event:');
   
   const { type, challenge, event } = req.body;
 
@@ -155,7 +155,7 @@ app.post('/slack/events', async (req, res) => {
     console.log('💬 Processing message event:', {
       user: event.user,
       channel: event.channel,
-      text: event.text,
+    //   text: event.text,
       timestamp: event.ts
     });
     
@@ -170,7 +170,7 @@ app.post('/slack/events', async (req, res) => {
       console.log('📊 Preparing to log to Google Sheets:', {
         timestamp,
         user,
-        message: event.text,
+        // message: event.text,
         channel
       });
 
@@ -190,11 +190,11 @@ app.post('/slack/events', async (req, res) => {
         });
 
         console.log('✅ On-call message successfully logged to Google Sheets');
-        console.log('📊 Append result:', {
-          updatedRows: result.data.updates?.updatedRows,
-          updatedColumns: result.data.updates?.updatedColumns,
-          updatedCells: result.data.updates?.updatedCells
-        });
+        // console.log('📊 Append result:', {
+        //   updatedRows: result.data.updates?.updatedRows,
+        //   updatedColumns: result.data.updates?.updatedColumns,
+        //   updatedCells: result.data.updates?.updatedCells
+        // });
       } catch (err) {
         console.error('❌ Google Sheets error:', {
           message: err.message,
