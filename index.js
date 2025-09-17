@@ -170,7 +170,7 @@ app.post('/slack/events', async (req, res) => {
       console.log('📊 Preparing to log to Google Sheets:', {
         timestamp,
         user,
-        // message: event.text,
+        message: event.text,
         channel
       });
 
