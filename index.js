@@ -142,7 +142,7 @@ app.use((req, res, next) => {
 app.post('/slack/events', async (req, res) => {
   console.log('📨 Received Slack event:');
   
-//   console.log(req.body);
+  console.log('req.body=====>',req.body);//we need to comment this out later
   
   const { type, challenge, event } = req.body;
 
