@@ -162,7 +162,7 @@ app.post('/slack/events', async (req, res) => {
     });
     
     const message = (event.text || '').toLowerCase();
-    if (message.includes('oncall') || message.includes('on-call') || event.message.textevent.message.text!== undefined) { //skipping if to capture all
+    if (message.includes('oncall') || message.includes('on-call') || event.message.text!== undefined) { //skipping if to capture all
       console.log('🚨 On-call keyword detected in message');
       
       const timestamp = new Date().toISOString();
