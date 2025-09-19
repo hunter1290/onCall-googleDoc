@@ -212,17 +212,15 @@ app.post('/test-sheets', async (req, res) => {
 
 
 app.post('/slack/events', async (req, res) => {
-  // console.log('📨 Received Slack event');
-
   const { type, challenge, event } = req.body;
-  console.log('📨 Received Slack event', req.body);
+  console.log('📨 Received Slack event');
 
-  // Handle Slack verification
+  // Slack verification challenge
   if (type === 'url_verification') {
     return res.status(200).json({ challenge });
   }
 
-  if (event && event.type === 'message') {
+  if (event?.type === 'message') {
     let messageText = '';
     if (event.subtype === 'message_changed') {
       messageText = event.message?.text || event.previous_message?.text || '';
@@ -231,116 +229,122 @@ app.post('/slack/events', async (req, res) => {
     }
 
     if (!messageText.trim()) {
-      console.log('⚠️ No message text found (even in previous_message), skipping');
+      console.log('⚠️ No message text found, skipping');
       return res.sendStatus(200);
     }
 
     const lowerMessage = messageText.toLowerCase();
-    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')||lowerMessage.includes('firing')||lowerMessage.includes('critical')|| 
-    lowerMessage.includes('incident') || lowerMessage.includes('status') ) {
-      console.log('🚨 On-call related message detected');
+    const isRelevant = ['oncall', 'on-call', 'firing', 'critical', 'incident', 'status','4xx','5xx','failed','500'].some(keyword =>
+      lowerMessage.includes(keyword)
+    );
 
-      const now = new Date();
-      const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const time = now.toTimeString().split(' ')[0]; // HH:MM:SS
+    if (!isRelevant) {
+      console.log('ℹ️ Message does not contain relevant keywords, skipping');
+      return res.sendStatus(200);
+    }
 
-      const user = event.user || event.message?.user || 'unknown';
-      const channel = event.channel || 'unknown';
+    const now = new Date();
+    const date = now.toISOString().split('T')[0];
+    const time = now.toTimeString().split(' ')[0];
+    const user = event.user || event.message?.user || 'unknown';
+    const channel = event.channel || 'unknown';
 
-      // Extract Title from alert (e.g., between the "|" and ">*")
-      const titleMatch = messageText.match(/\|\s?#?\d*\s?\[.*?\](.*?)\>\*/);
-      const title = titleMatch ? titleMatch[1].trim() : 'Unknown Title';
+    // SAFER EXTRACTION USING LINE PARSING
+    const lines = messageText.split(/\r?\n|\\n/);
+    const fields = {
+      atsName: 'N/A',
+      atsCustomerName: 'N/A',
+      customerId: 'N/A',
+      summary: 'N/A',
+      description: 'No description',
+      importantPoints: []
+    };
 
-      // Extract Description
-      const descriptionMatch = messageText.match(/description:\s*(.*?)\\n/i);
-      const description = descriptionMatch ? descriptionMatch[1].trim() : 'No description';
+    let inAnnotations = false;
+    for (let line of lines) {
+      line = line.trim();
 
-      // Extract Alert ID from the link
-      const alertIdMatch = messageText.match(/alert-groups\/(.*?)\|/);
-      const alertId = alertIdMatch ? alertIdMatch[1].trim() : 'Unknown Alert ID';
-    
-      const sourceUrlMatch = messageText.match(/<([^|>]+)\|source>/);
-      const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : 'N/A';
-    
-      const atsCustomerNameMatch = messageText.match(/atsCustomerName:\s*(.+)/i);
-      const atsCustomerName = atsCustomerNameMatch ? atsCustomerNameMatch[1].trim() : 'N/A';
-  
-      const atsNameMatch = messageText.match(/atsName:\s*(.+)/i);
-      const atsName = atsNameMatch ? atsNameMatch[1].trim() : 'N/A';
-  
-      const customerIdMatch = messageText.match(/customerId:\s*([a-z0-9-]+)/i);
-      const customerId = customerIdMatch ? customerIdMatch[1].trim() : 'N/A';
-  
-      const summaryMatch = messageText.match(/summary:\s*(.+)/i);
-      const summary = summaryMatch ? summaryMatch[1].trim() : 'N/A';
+      // Parse fields
+      if (/^atsName:/i.test(line)) fields.atsName = line.split(':')[1]?.trim() || 'N/A';
+      if (/^atsCustomerName:/i.test(line)) fields.atsCustomerName = line.split(':')[1]?.trim() || 'N/A';
+      if (/^customerId:/i.test(line)) fields.customerId = line.split(':')[1]?.trim() || 'N/A';
+      if (/^summary:/i.test(line)) fields.summary = line.split(':')[1]?.trim() || 'N/A';
+      if (/^description:/i.test(line)) {
+        fields.description = line.split(':')[1]?.trim() || 'No description';
+        inAnnotations = true;
+        continue;
+      }
 
-      // Extract important bullet points like `- Batch Run ID: ...`
-    const importantPoints = [];
-    const lines = messageText.split(/\n|\\n/);
-    for (const line of lines) {
-      if (line.trim().startsWith('-')) {
-        importantPoints.push(line.trim());
+      // Collect bullet points under annotations
+      if (inAnnotations && line.startsWith('-')) {
+        fields.importantPoints.push(line);
+      }
+
+      // End collection on blank line
+      if (inAnnotations && line === '') {
+        inAnnotations = false;
       }
     }
-    const importantSummary = importantPoints.join('; ');
 
-      console.log('📊 Logging to Google Sheets:', {
-        date,
-        time,
-        user,
-        title,
-        description,
-        alertId,
-        channel,
-        sourceUrl,
-        atsCustomerName,
-        atsName,
-        customerId,
-        summary,
-        importantSummary
+    const alertIdMatch = messageText.match(/alert-groups\/([a-zA-Z0-9]+)\|/);
+    const alertId = alertIdMatch ? alertIdMatch[1] : 'Unknown Alert ID';
+
+    const sourceUrlMatch = messageText.match(/<([^|>]+)\|source>/);
+    const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : 'N/A';
+
+    const titleMatch = messageText.match(/\|\s?#?\d*\s?\[.*?\](.*?)\>\*/);
+    const title = titleMatch ? titleMatch[1].trim() : 'Unknown Title';
+
+    const importantSummary = fields.importantPoints.join('; ');
+
+    const values = [
+      date,
+      time,
+      user,
+      title,
+      fields.description,
+      alertId,
+      channel,
+      sourceUrl,
+      fields.atsCustomerName,
+      fields.atsName,
+      fields.customerId,
+      fields.summary,
+      importantSummary
+    ];
+
+    console.log('📊 Logging to Google Sheets:', values);
+
+    try {
+      if (!process.env.GOOGLE_SHEET_ID) {
+        throw new Error('GOOGLE_SHEET_ID not set in environment');
+      }
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: 'onCallLog!A:M',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [values],
+        },
       });
-      try {
-        if (!process.env.GOOGLE_SHEET_ID) {
-          throw new Error('GOOGLE_SHEET_ID environment variable is not set');
-        }
 
-        await sheets.spreadsheets.values.append({
-          spreadsheetId: process.env.GOOGLE_SHEET_ID,
-          range:  'onCallLog!A:M', // 7 columns
-          valueInputOption: 'USER_ENTERED',
-          requestBody: {
-            values: [[date, time, user, title, messageText, alertId, channel, sourceUrl, atsCustomerName,
-              atsName,
-              customerId,
-              summary,
-              importantSummary]],
-          },
-        });
-
-        console.log('✅ Alert successfully logged to Google Sheets');
-      } catch (err) {
-        console.error('❌ Google Sheets error:', {
-          message: err.message,
-          code: err.code,
-          status: err.status,
-          details: err.errors || err.details,
-          response: err.response?.data
-        });
-
-        return res.status(500).json({
-          error: 'Failed to log to Google Sheets',
-          details: err.message
-        });
-      }
-    } else {
-      console.log('ℹ️ Message does not contain on-call keywords, skipping');
+      console.log('✅ Data successfully written to Google Sheets');
+    } catch (err) {
+      console.error('❌ Google Sheets error:', {
+        message: err.message,
+        details: err.response?.data || err
+      });
+      return res.status(500).json({
+        error: 'Failed to log to Google Sheets',
+        details: err.message
+      });
     }
-  } else {
-    console.log('ℹ️ Event is not a message type, skipping');
   }
 
   res.sendStatus(200);
 });
+
 
 
 // Start server
