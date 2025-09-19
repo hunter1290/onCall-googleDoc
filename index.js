@@ -127,6 +127,90 @@ app.post('/test-sheets', async (req, res) => {
 });
 
 // Slack Events Endpoint
+// app.post('/slack/events', async (req, res) => {
+//   console.log('📨 Received Slack event');
+
+//   const { type, challenge, event } = req.body;
+
+//   // Handle Slack verification
+//   if (type === 'url_verification') {
+//     console.log('🔐 Slack URL verification challenge received');
+//     return res.status(200).json({ challenge });
+//   }
+
+//   // Only proceed if it's a message event
+//   if (event && event.type === 'message') {
+//     let messageText = '';
+
+//     // Support both regular and edited messages
+//     if (event.subtype === 'message_changed') {
+//       messageText = event.message?.text || '';
+//     } else {
+//       messageText = event.text || '';
+//     }
+
+//     // Skip empty messages
+//     if (!messageText.trim()) {
+//       console.log('⚠️ Skipping empty message');
+//       return res.sendStatus(200);
+//     }
+
+//     // Check for "oncall" or "on-call"
+//     const lowerMessage = messageText.toLowerCase();
+//     if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')||lowerMessage.includes('firing')||lowerMessage.includes('critical')) {
+//       console.log('🚨 On-call keyword detected in message');
+
+//       const timestamp = new Date().toISOString();
+//       const user = event.user || event.message?.user || 'unknown';
+//       const channel = event.channel || 'unknown';
+
+//       console.log('📊 Preparing to log to Google Sheets:', {
+//         timestamp,
+//         user,
+//         message: messageText,
+//         channel
+//       });
+
+//       try {
+//         if (!process.env.GOOGLE_SHEET_ID) {
+//           throw new Error('GOOGLE_SHEET_ID environment variable is not set');
+//         }
+
+//         await sheets.spreadsheets.values.append({
+//           spreadsheetId: process.env.GOOGLE_SHEET_ID,
+//           range: 'onCallLog!A:D',
+//           valueInputOption: 'USER_ENTERED',
+//           requestBody: {
+//             values: [[timestamp, user, messageText, channel]],
+//           },
+//         });
+
+//         console.log('✅ On-call message successfully logged to Google Sheets');
+//       } catch (err) {
+//         console.error('❌ Google Sheets error:', {
+//           message: err.message,
+//           code: err.code,
+//           status: err.status,
+//           details: err.errors || err.details,
+//           response: err.response?.data
+//         });
+
+//         return res.status(500).json({
+//           error: 'Failed to log to Google Sheets',
+//           details: err.message
+//         });
+//       }
+//     } else {
+//       console.log('ℹ️ Message does not contain on-call keywords, skipping');
+//     }
+//   } else {
+//     console.log('ℹ️ Event is not a message type, skipping');
+//   }
+
+//   res.sendStatus(200);
+// });
+
+
 app.post('/slack/events', async (req, res) => {
   console.log('📨 Received Slack event');
 
@@ -134,40 +218,53 @@ app.post('/slack/events', async (req, res) => {
 
   // Handle Slack verification
   if (type === 'url_verification') {
-    console.log('🔐 Slack URL verification challenge received');
     return res.status(200).json({ challenge });
   }
 
-  // Only proceed if it's a message event
   if (event && event.type === 'message') {
     let messageText = '';
-
-    // Support both regular and edited messages
     if (event.subtype === 'message_changed') {
-      messageText = event.message?.text || '';
+      messageText = event.message?.text || event.previous_message?.text || '';
     } else {
       messageText = event.text || '';
     }
 
-    // Skip empty messages
     if (!messageText.trim()) {
-      console.log('⚠️ Skipping empty message');
+      console.log('⚠️ No message text found (even in previous_message), skipping');
       return res.sendStatus(200);
     }
 
-    // Check for "oncall" or "on-call"
     const lowerMessage = messageText.toLowerCase();
-    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')||lowerMessage.includes('firing')||lowerMessage.includes('critical')) {
-      console.log('🚨 On-call keyword detected in message');
+    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')||lowerMessage.includes('firing')||lowerMessage.includes('critical')|| 
+    lowerMessage.includes('incident') || lowerMessage.includes('status') ) {
+      console.log('🚨 On-call related message detected');
 
-      const timestamp = new Date().toISOString();
+      const now = new Date();
+      const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const time = now.toTimeString().split(' ')[0]; // HH:MM:SS
+
       const user = event.user || event.message?.user || 'unknown';
       const channel = event.channel || 'unknown';
 
-      console.log('📊 Preparing to log to Google Sheets:', {
-        timestamp,
+      // Extract Title from alert (e.g., between the "|" and ">*")
+      const titleMatch = messageText.match(/\|\s?#?\d*\s?\[.*?\](.*?)\>\*/);
+      const title = titleMatch ? titleMatch[1].trim() : 'Unknown Title';
+
+      // Extract Description
+      const descriptionMatch = messageText.match(/description:\s*(.*?)\\n/i);
+      const description = descriptionMatch ? descriptionMatch[1].trim() : 'No description';
+
+      // Extract Alert ID from the link
+      const alertIdMatch = messageText.match(/alert-groups\/(.*?)\|/);
+      const alertId = alertIdMatch ? alertIdMatch[1].trim() : 'Unknown Alert ID';
+
+      console.log('📊 Logging alert:', {
+        date,
+        time,
         user,
-        message: messageText,
+        title,
+        description,
+        alertId,
         channel
       });
 
@@ -178,14 +275,14 @@ app.post('/slack/events', async (req, res) => {
 
         await sheets.spreadsheets.values.append({
           spreadsheetId: process.env.GOOGLE_SHEET_ID,
-          range: 'onCallLog!A:D',
+          range: 'onCallLog!A:G', // 7 columns
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[timestamp, user, messageText, channel]],
+            values: [[date, time, user, title, description, alertId, channel]],
           },
         });
 
-        console.log('✅ On-call message successfully logged to Google Sheets');
+        console.log('✅ Alert successfully logged to Google Sheets');
       } catch (err) {
         console.error('❌ Google Sheets error:', {
           message: err.message,
@@ -209,6 +306,7 @@ app.post('/slack/events', async (req, res) => {
 
   res.sendStatus(200);
 });
+
 
 // Start server
 app.listen(PORT, () => {
