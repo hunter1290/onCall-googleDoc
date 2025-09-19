@@ -212,9 +212,10 @@ app.post('/test-sheets', async (req, res) => {
 
 
 app.post('/slack/events', async (req, res) => {
-  console.log('📨 Received Slack event');
+  // console.log('📨 Received Slack event');
 
   const { type, challenge, event } = req.body;
+  console.log('📨 Received Slack event', req.body);
 
   // Handle Slack verification
   if (type === 'url_verification') {
@@ -257,7 +258,9 @@ app.post('/slack/events', async (req, res) => {
       // Extract Alert ID from the link
       const alertIdMatch = messageText.match(/alert-groups\/(.*?)\|/);
       const alertId = alertIdMatch ? alertIdMatch[1].trim() : 'Unknown Alert ID';
-
+    
+      const sourceUrlMatch = messageText.match(/<([^|>]+)\|source>/);
+      const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : 'N/A';
     
 
       console.log('📊 Logging alert:', {
@@ -268,6 +271,7 @@ app.post('/slack/events', async (req, res) => {
         description,
         alertId,
         channel,
+        sourceUrl
       });
 
       try {
@@ -280,7 +284,7 @@ app.post('/slack/events', async (req, res) => {
           range: 'onCallLogUpdated!A:G', // 7 columns
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[date, time, user, title, description, alertId, channel, messageText]],
+            values: [[date, time, user, title, messageText, alertId, channel, sourceUrl]],
           },
         });
 
