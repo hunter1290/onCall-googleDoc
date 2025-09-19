@@ -157,7 +157,7 @@ app.post('/slack/events', async (req, res) => {
 
     // Check for "oncall" or "on-call"
     const lowerMessage = messageText.toLowerCase();
-    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')) {
+    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')||lowerMessage.includes('firing')||lowerMessage.includes('critical')) {
       console.log('🚨 On-call keyword detected in message');
 
       const timestamp = new Date().toISOString();
