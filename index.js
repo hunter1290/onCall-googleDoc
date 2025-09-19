@@ -325,7 +325,7 @@ app.post('/slack/events', async (req, res) => {
         range: 'onCallLog!A:M',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [values],
+          values: [[values]],
         },
       });
 
