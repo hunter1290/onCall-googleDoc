@@ -21,7 +21,6 @@ auth.authorize()
   .then(async () => {
     console.log('✅ Google Sheets authentication successful');
     
-    // Test if we can access the sheet
     if (process.env.GOOGLE_SHEET_ID) {
       console.log('🔍 Attempting to access Google Sheet with ID:', process.env.GOOGLE_SHEET_ID);
       try {
@@ -31,7 +30,6 @@ auth.authorize()
         console.log('✅ Google Sheet access confirmed:', response.data.properties.title);
         console.log('📊 Sheet URL:', `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}`);
         
-        // Check if the onCallLog sheet exists
         const sheetExists = response.data.sheets.some(sheet => 
           sheet.properties.title === 'onCallLog'
         );
@@ -71,7 +69,7 @@ auth.authorize()
     console.error('Check your service account credentials');
   });
 
-// Parse JSON body
+// Middleware
 app.use(bodyParser.json());
 
 // Health check endpoint
@@ -85,15 +83,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Test endpoint to manually test Google Sheets functionality
+// Test endpoint for Google Sheets
 app.post('/test-sheets', async (req, res) => {
   console.log('🧪 Testing Google Sheets functionality');
-  
+
   try {
     if (!process.env.GOOGLE_SHEET_ID) {
-      return res.status(400).json({ 
-        error: 'GOOGLE_SHEET_ID not configured' 
-      });
+      return res.status(400).json({ error: 'GOOGLE_SHEET_ID not configured' });
     }
 
     const testData = [
@@ -107,9 +103,7 @@ app.post('/test-sheets', async (req, res) => {
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: 'onCallLog!A:D',
       valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [testData],
-      },
+      requestBody: { values: [testData] },
     });
 
     console.log('✅ Test data successfully appended to Google Sheets');
@@ -132,71 +126,66 @@ app.post('/test-sheets', async (req, res) => {
   }
 });
 
-// Log all incoming requests
-app.use((req, res, next) => {
-//   console.log(`📥 ${req.method} ${req.path} - ${new Date().toISOString()}`);
-  next();
-});
-
 // Slack Events Endpoint
 app.post('/slack/events', async (req, res) => {
-  console.log('📨 Received Slack event:');
-  
-  console.log('req.body=====>',req.body);//we need to comment this out later
-  
+  console.log('📨 Received Slack event');
+
   const { type, challenge, event } = req.body;
 
-  // Slack URL verification
+  // Handle Slack verification
   if (type === 'url_verification') {
     console.log('🔐 Slack URL verification challenge received');
     return res.status(200).json({ challenge });
   }
 
-  // Log oncall messages
-  if ((event && event.type === 'message' && !event.bot_id )|| event.message.text!== undefined) { // skingpping if to capture all
-    console.log('💬 Processing message event:', {
-      user: event.user,
-      channel: event.channel,
-    //   text: event.text,
-      timestamp: event.ts
-    });
-    
-    const message = (event.text || '').toLowerCase();
-    if (message.includes('oncall') || message.includes('on-call') || event.message.text!== undefined) { //skipping if to capture all
+  // Only proceed if it's a message event
+  if (event && event.type === 'message') {
+    let messageText = '';
+
+    // Support both regular and edited messages
+    if (event.subtype === 'message_changed') {
+      messageText = event.message?.text || '';
+    } else {
+      messageText = event.text || '';
+    }
+
+    // Skip empty messages
+    if (!messageText.trim()) {
+      console.log('⚠️ Skipping empty message');
+      return res.sendStatus(200);
+    }
+
+    // Check for "oncall" or "on-call"
+    const lowerMessage = messageText.toLowerCase();
+    if (lowerMessage.includes('oncall') || lowerMessage.includes('on-call')) {
       console.log('🚨 On-call keyword detected in message');
-      
+
       const timestamp = new Date().toISOString();
-      const user = event.user;
-      const channel = event.channel;
+      const user = event.user || event.message?.user || 'unknown';
+      const channel = event.channel || 'unknown';
 
       console.log('📊 Preparing to log to Google Sheets:', {
         timestamp,
         user,
-        message: event.message.text,
+        message: messageText,
         channel
       });
 
       try {
-        // Validate required environment variables
         if (!process.env.GOOGLE_SHEET_ID) {
           throw new Error('GOOGLE_SHEET_ID environment variable is not set');
         }
 
-        const result = await sheets.spreadsheets.values.append({
+        await sheets.spreadsheets.values.append({
           spreadsheetId: process.env.GOOGLE_SHEET_ID,
           range: 'onCallLog!A:D',
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[timestamp, user, event.message.text, channel]],
+            values: [[timestamp, user, messageText, channel]],
           },
         });
 
         console.log('✅ On-call message successfully logged to Google Sheets');
-        // console.log('📊 Append result:', {
-        //   updatedRows: result.data.updates?.updatedRows,
-        //   updatedColumns: result.data.updates?.updatedColumns,
-        //   updatedCells: result.data.updates?.updatedCells
-        // });
       } catch (err) {
         console.error('❌ Google Sheets error:', {
           message: err.message,
@@ -205,26 +194,25 @@ app.post('/slack/events', async (req, res) => {
           details: err.errors || err.details,
           response: err.response?.data
         });
-        
-        // Return error response to Slack
-        return res.status(500).json({ 
+
+        return res.status(500).json({
           error: 'Failed to log to Google Sheets',
-          details: err.message 
+          details: err.message
         });
       }
     } else {
       console.log('ℹ️ Message does not contain on-call keywords, skipping');
     }
   } else {
-    console.log('ℹ️ Event is not a user message or is from bot, skipping');
+    console.log('ℹ️ Event is not a message type, skipping');
   }
 
   res.sendStatus(200);
 });
 
-// Start the server
+// Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server started successfully on port ${PORT}`);
+  console.log(`🚀 Server started on port ${PORT}`);
   console.log(`📡 Slack events endpoint: http://localhost:${PORT}/slack/events`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/test-sheets`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
