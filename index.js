@@ -322,10 +322,22 @@ app.post('/slack/events', async (req, res) => {
 
       await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: 'onCallLog!A:M',
+        range: 'onCallLog!A:L',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [[values]],
+          values: [[date,
+            time,
+            user,
+            title,
+            fields.description,
+            alertId,
+            channel,
+            sourceUrl,
+            fields.atsCustomerName,
+            fields.atsName,
+            fields.customerId,
+            fields.summary,
+            importantSummary]],
         },
       });
 
