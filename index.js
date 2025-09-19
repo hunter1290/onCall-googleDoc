@@ -295,6 +295,10 @@ app.post('/slack/events', async (req, res) => {
     const titleMatch = messageText.match(/\|\s?#?\d*\s?\[.*?\](.*?)\>\*/);
     const title = titleMatch ? titleMatch[1].trim() : 'Unknown Title';
 
+    // Extract On-Call ID like #33920
+  const onCallIdMatch = messageText.match(/\|#(\d+)/);
+  const onCallId = onCallIdMatch ? `#${onCallIdMatch[1]}` : 'N/A';
+
     const importantSummary = fields.importantPoints.join('; ');
 
     const values = [
@@ -310,7 +314,8 @@ app.post('/slack/events', async (req, res) => {
       fields.atsName,
       fields.customerId,
       fields.summary,
-      importantSummary
+      importantSummary,
+      onCallId
     ];
 
     console.log('📊 Logging to Google Sheets:', values);
@@ -322,7 +327,7 @@ app.post('/slack/events', async (req, res) => {
 
       await sheets.spreadsheets.values.append({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
-        range: 'onCallLogUpdated!A:L',
+        range: 'onCallLogUpdated!A:M',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[date,
@@ -337,7 +342,8 @@ app.post('/slack/events', async (req, res) => {
             fields.atsName,
             fields.customerId,
             fields.summary,
-            importantSummary]],
+            importantSummary,
+            onCallId]],
         },
       });
 
