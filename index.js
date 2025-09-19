@@ -262,8 +262,29 @@ app.post('/slack/events', async (req, res) => {
       const sourceUrlMatch = messageText.match(/<([^|>]+)\|source>/);
       const sourceUrl = sourceUrlMatch ? sourceUrlMatch[1] : 'N/A';
     
+      const atsCustomerNameMatch = messageText.match(/atsCustomerName:\s*(.+)/i);
+      const atsCustomerName = atsCustomerNameMatch ? atsCustomerNameMatch[1].trim() : 'N/A';
+  
+      const atsNameMatch = messageText.match(/atsName:\s*(.+)/i);
+      const atsName = atsNameMatch ? atsNameMatch[1].trim() : 'N/A';
+  
+      const customerIdMatch = messageText.match(/customerId:\s*([a-z0-9-]+)/i);
+      const customerId = customerIdMatch ? customerIdMatch[1].trim() : 'N/A';
+  
+      const summaryMatch = messageText.match(/summary:\s*(.+)/i);
+      const summary = summaryMatch ? summaryMatch[1].trim() : 'N/A';
 
-      console.log('📊 Logging alert:', {
+      // Extract important bullet points like `- Batch Run ID: ...`
+    const importantPoints = [];
+    const lines = messageText.split(/\n|\\n/);
+    for (const line of lines) {
+      if (line.trim().startsWith('-')) {
+        importantPoints.push(line.trim());
+      }
+    }
+    const importantSummary = importantPoints.join('; ');
+
+      console.log('📊 Logging to Google Sheets:', {
         date,
         time,
         user,
@@ -271,9 +292,13 @@ app.post('/slack/events', async (req, res) => {
         description,
         alertId,
         channel,
-        sourceUrl
+        sourceUrl,
+        atsCustomerName,
+        atsName,
+        customerId,
+        summary,
+        importantSummary
       });
-
       try {
         if (!process.env.GOOGLE_SHEET_ID) {
           throw new Error('GOOGLE_SHEET_ID environment variable is not set');
@@ -284,7 +309,11 @@ app.post('/slack/events', async (req, res) => {
           range: 'onCallLogUpdated!A:G', // 7 columns
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[date, time, user, title, messageText, alertId, channel, sourceUrl]],
+            values: [[date, time, user, title, messageText, alertId, channel, sourceUrl, atsCustomerName,
+              atsName,
+              customerId,
+              summary,
+              importantSummary]],
           },
         });
 
