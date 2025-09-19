@@ -258,6 +258,8 @@ app.post('/slack/events', async (req, res) => {
       const alertIdMatch = messageText.match(/alert-groups\/(.*?)\|/);
       const alertId = alertIdMatch ? alertIdMatch[1].trim() : 'Unknown Alert ID';
 
+    
+
       console.log('📊 Logging alert:', {
         date,
         time,
@@ -265,7 +267,7 @@ app.post('/slack/events', async (req, res) => {
         title,
         description,
         alertId,
-        channel
+        channel,
       });
 
       try {
@@ -278,7 +280,7 @@ app.post('/slack/events', async (req, res) => {
           range: 'onCallLogUpdated!A:G', // 7 columns
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[date, time, user, title, description, alertId, channel]],
+            values: [[date, time, user, title, description, alertId, channel, messageText]],
           },
         });
 
