@@ -234,7 +234,7 @@ app.post('/slack/events', async (req, res) => {
     }
 
     const lowerMessage = messageText.toLowerCase();
-    const isRelevant = ['oncall', 'on-call', 'firing', 'critical', 'incident', 'status','4xx','5xx','failed','500'].some(keyword =>
+    const isRelevant = ['oncall', 'on-call', 'firing', 'critical', 'incident', 'status','4xx','5xx','failed','500','ATS','Parternship','ats-unified-apis'].some(keyword =>
       lowerMessage.includes(keyword)
     );
 
