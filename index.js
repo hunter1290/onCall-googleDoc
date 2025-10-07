@@ -20,7 +20,7 @@ const sheets = google.sheets({ version: 'v4', auth });
 auth.authorize()
   .then(async () => {
     console.log('✅ Google Sheets authentication successful');
-    
+
     if (process.env.GOOGLE_SHEET_ID) {
       console.log('🔍 Attempting to access Google Sheet with ID:', process.env.GOOGLE_SHEET_ID);
       try {
@@ -29,11 +29,11 @@ auth.authorize()
         });
         console.log('✅ Google Sheet access confirmed:', response.data.properties.title);
         console.log('📊 Sheet URL:', `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}`);
-        
+
         const sheetExists = response.data.sheets.some(sheet => 
-          sheet.properties.title === 'onCallLogUpdated'
+          sheet.properties.title === 'onCallLog'
         );
-        
+
         if (!sheetExists) {
           console.warn('⚠️ Warning: onCallLog sheet not found. Please create it or the data will not be logged.');
         } else {
@@ -46,7 +46,7 @@ auth.authorize()
           status: err.status,
           details: err.response?.data
         });
-        
+
         if (err.message.includes('permission')) {
           console.error('🔐 PERMISSION ISSUE:');
           console.error('1. Make sure your service account email has access to the sheet');
@@ -101,7 +101,7 @@ app.post('/test-sheets', async (req, res) => {
 
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'onCallLogUpdated!A:D',
+      range: 'onCallLog!A:D',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [testData] },
     });
@@ -242,8 +242,6 @@ app.post('/slack/events', async (req, res) => {
       console.log('ℹ️ Message does not contain relevant keywords, skipping');
       return res.sendStatus(200);
     }
-    
-    console.log("message Text",JSON.parse(event));
 
     const now = new Date();
     const date = now.toISOString().split('T')[0];
