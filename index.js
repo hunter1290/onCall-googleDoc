@@ -31,7 +31,7 @@ auth.authorize()
         console.log('📊 Sheet URL:', `https://docs.google.com/spreadsheets/d/${process.env.GOOGLE_SHEET_ID}`);
         
         const sheetExists = response.data.sheets.some(sheet => 
-          sheet.properties.title === 'onCallLog'
+          sheet.properties.title === 'onCallLogUpdated'
         );
         
         if (!sheetExists) {
@@ -101,7 +101,7 @@ app.post('/test-sheets', async (req, res) => {
 
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'onCallLog!A:D',
+      range: 'onCallLogUpdated!A:D',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [testData] },
     });
