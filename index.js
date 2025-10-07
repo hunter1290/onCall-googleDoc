@@ -242,6 +242,8 @@ app.post('/slack/events', async (req, res) => {
       console.log('ℹ️ Message does not contain relevant keywords, skipping');
       return res.sendStatus(200);
     }
+    
+    console.log("message Text",JSON.parse(event));
 
     const now = new Date();
     const date = now.toISOString().split('T')[0];
